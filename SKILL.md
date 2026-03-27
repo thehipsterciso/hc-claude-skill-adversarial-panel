@@ -18,7 +18,7 @@ description: >
 
 When this skill triggers, you — this conversation — own the full document loop. You draft. You orchestrate the panel. You revise. You output. The user does not see drafts, does not make decisions during the loop, and does not interact with the panel. They provide their intent at the start and receive the final document at the end.
 
-The seven executive lens agents and the Intent Guardian run as independent Agent tool calls — isolated invocations with no shared context between them. This is what makes the panel genuinely adversarial: each lens reads the document cold, without knowing what any other lens thought.
+The seven executive lens agents, the Consistency Auditor, and the Intent Guardian run as independent Agent tool calls — isolated invocations with no shared context between them. This is what makes the panel genuinely adversarial: each lens reads the document cold, without knowing what any other lens thought.
 
 ---
 
@@ -48,7 +48,14 @@ Revise the document to address all flagged concerns. Rules for revision:
 - Reframe, reword, or add — do not remove substantive content to satisfy a lens
 - If a concern cannot be addressed without removing substance, that is an ESCALATE, not an EXECUTION fix
 - Do not introduce new problems while solving existing ones
-- Run the panel again on the revised draft
+
+After every revision, before running the panel again, invoke the Consistency Auditor as an independent Agent tool call. Pass it:
+- The contents of `agents/consistency-auditor.md`
+- The revised draft in full
+
+**If the Consistency Auditor returns FLAGGED:** Apply all flagged fixes. Run the Consistency Auditor again on the corrected draft. Do not run the panel until the Consistency Auditor returns CLEARED.
+
+**If the Consistency Auditor returns CLEARED:** Run the panel again on the revised draft.
 
 **If any lens returns FLAGGED with ESCALATE:**
 Surface a panel flag to the user (format below). Wait for their decision. Resume the loop with their answer in context.
@@ -83,12 +90,13 @@ Status values: `reviewing` · `flagged` · `revising` · `resolved` · `cleared`
 
 Example:
 ```
-CFO          | forward-looking statement        | flagged
-GC           | discovery-safe language          | revising
-CHRO         | employer brand tone              | resolved
-CEO          | narrative consistency            | cleared
-CMO          | headline risk in paragraph two   | flagged
-Intent Guardian | purpose alignment check       | reviewing
+CFO               | forward-looking statement        | flagged
+GC                | discovery-safe language          | revising
+CHRO              | employer brand tone              | resolved
+CEO               | narrative consistency            | cleared
+CMO               | headline risk in paragraph two   | flagged
+Consistency Auditor | math and claim coherence       | reviewing
+Intent Guardian   | purpose alignment check          | reviewing
 ```
 
 New line per role per cycle. The labels are the communication. Do not explain the process.
@@ -113,6 +121,7 @@ Do not propose solutions. Present the tension. The user decides. The loop resume
 
 - Maximum five revision cycles. Unresolved concerns after five cycles become panel flags.
 - Each lens clears independently. A cleared lens does not re-run unless your revision touches their domain.
+- Consistency Auditor runs after every revision, before every panel re-run. No exceptions.
 - Intent Guardian runs only after the panel clears.
 - Do not skip lenses. All seven run every cycle unless already cleared.
 
@@ -135,6 +144,7 @@ When in doubt: write the language that the most adversarial possible reader in e
 ## Reference Files
 
 - `agents/ceo-lens.md` through `agents/ciso-lens.md` — pass to each Agent tool call for panel review
+- `agents/consistency-auditor.md` — pass to Agent tool call after every revision, before panel re-run
 - `agents/intent-guardian.md` — pass to Agent tool call after panel clears
 - `profiles/default/` — default archetype profiles for each role
 - `profiles/custom/` — user-provided profiles; check here first
