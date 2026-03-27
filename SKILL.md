@@ -2,7 +2,7 @@
 name: adversarial-panel
 description: >
   Embeds an adversarial C-suite review panel into the writing process for any formal, discoverable corporate document.
-  The panel is not a post-production step — it is the writing process. Use this skill automatically and without prompting
+  The panel is not a post-production step — it is the writing process. Trigger automatically and without prompting
   whenever the user is creating or drafting any of the following: board memos, board presentations, shareholder letters,
   earnings communications, press releases, workforce announcements (reductions, restructuring, layoffs), executive speeches,
   regulatory filings, investor updates, M&A communications, crisis communications, incident disclosures, data breach
@@ -14,109 +14,111 @@ description: >
 
 # Adversarial C-Suite Review Panel
 
-This skill embeds a seven-executive review panel into the content generation process for formal, discoverable corporate documents. The panel is not a post-production review. It is the writing process.
+## Architecture
 
-Read `references/executive-lenses.md` now. It defines the seven executive roles, their accountability domains, and their loss functions. These definitions drive every panel reaction — do not summarize or approximate them from memory.
+Seven independent executive agents review every draft. Each agent runs as a separate, isolated call — no shared context between lens agents. A writing agent orchestrates the loop. An Intent Guardian protects the user's original purpose through every revision cycle.
 
----
+**Agents:**
+- `agents/writing-agent.md` — Orchestrates the full loop. Drafts, revises, manages status, handles escalation.
+- `agents/ceo-lens.md` — Organizational credibility and strategic narrative
+- `agents/cfo-lens.md` — Financial accuracy and disclosure liability
+- `agents/gc-lens.md` — Legal exposure and discoverable language
+- `agents/chro-lens.md` — Employee relations and workforce risk
+- `agents/cro-lens.md` — Customer and commercial impact
+- `agents/cmo-lens.md` — Brand integrity and message consistency
+- `agents/ciso-lens.md` — Information security and sensitive disclosure
+- `agents/intent-guardian.md` — Intent drift detection after panel clears
 
-## How the Process Works
-
-### Before writing anything: capture the user's intent
-
-Before the writing agent produces a single word, establish and hold the user's original document purpose. This becomes the Intent Guardian's reference for the entire session. Be specific: not "write a press release" but "announce a 340-person workforce reduction, lead with accountability, protect employer brand, avoid triggering customer anxiety about business continuity." The more precise the intent, the better the Intent Guardian can protect it through revision cycles.
-
-### The writing loop
-
-**Step 1 — Draft**
-The writing agent produces a complete draft. Not an outline, not a skeleton — a full draft that could be sent as-is if it passed the panel.
-
-**Step 2 — Panel review**
-The seven executives read the draft as cold, first-time readers in their roles. Each one reacts from their own accountability and loss function — not as a helpful editor, but as the executive who will be held responsible if this document creates a problem in their domain. Each lens surfaces:
-- What they would think on first read
-- What they would question or push back on
-- What they would object to and why
-
-These reactions go back to the writing agent. They do not surface to the user unless the loop cannot resolve.
-
-**Step 3 — Revise**
-The writing agent revises. The revision may change wording, voice, perspective, framing, structure — whatever the concern requires. The writing agent is not negotiating with the panel; it is solving the problem the panel identified.
-
-**Step 4 — Re-review**
-The panel reads the revised draft cold. The cycle repeats until the panel clears.
-
-**Step 5 — Intent check**
-After the panel clears, the Intent Guardian checks one thing: does the output still accomplish what the user originally asked it to accomplish? If yes, the output surfaces to the user. If no, the writing agent takes one more pass with the Intent Guardian's note in full context, and the loop runs again.
-
-**Step 6 — Output**
-The user receives the document that survived the full loop.
+**Profiles:**
+- `profiles/default/` — Composite archetype profiles for each role
+- `profiles/custom/` — User-provided profiles for real individuals; loaded in place of defaults when present
+- `profiles/README.md` — Profile format and customization instructions
 
 ---
 
-## What the User Sees While the Loop Runs
+## Session Start
 
-Display a lightweight status stream — not prose, not a decision request, just signal. Format:
+Before producing any content:
 
+1. **Load profiles.** Check `profiles/custom/` first. For any role with a custom profile present, use it. For roles without a custom profile, use `profiles/default/`. Each lens agent receives its own profile.
+
+2. **Capture intent.** Ask the user — or infer from context — the specific purpose of this document. Record it precisely. Not "write a press release" but "announce an 18% workforce reduction, lead with accountability, protect employer brand, keep customers from panicking about service continuity." This becomes the Intent Guardian's reference for the full session and does not change regardless of how the document evolves through revision.
+
+3. **Begin the writing loop.** See `agents/writing-agent.md`.
+
+---
+
+## Profile System
+
+Profiles define who is in each executive role for this document and this organization. They give lens agents personality, career history, specific hot-button concerns, and communication style — the difference between a generic CFO reaction and the reaction of a specific person with specific scars.
+
+**To use custom profiles:**
+- Place profile files in `profiles/custom/` using the format in `profiles/README.md`
+- Or tell the skill at session start: "Use [Name] as the [role]" — the skill will prompt for or infer profile details and construct a temporary profile for the session
+- Custom profiles replace defaults entirely for that role; they are not merged
+
+See `profiles/README.md` for the full format and examples.
+
+---
+
+## Status Display
+
+While the loop runs, display a lightweight status stream. Not prose. Not explanations. Just signal.
+
+Format:
 ```
 [Role] | [issue in three to five words] | [status]
 ```
 
-Status values: `reviewing`, `flagged`, `revising`, `resolved`, `cleared`
+Status values: `reviewing` · `flagged` · `revising` · `resolved` · `cleared`
 
 Example:
 ```
-CFO | forward-looking statement exposure | flagged
-CLO | discovery-ready language | revising
-CHRO | employer brand tone | resolved
-CEO | strategic narrative alignment | cleared
-Intent Guardian | checking purpose alignment | reviewing
+CFO          | forward-looking statement        | flagged
+GC           | discovery-safe language          | revising
+CHRO         | employer brand tone              | resolved
+CEO          | narrative consistency            | cleared
+CMO          | headline risk in paragraph two   | flagged
+Intent Guardian | purpose alignment check       | reviewing
 ```
 
-Use a new line per role per cycle. Do not explain what the panel is doing — the labels are the communication. Keep the stream moving. The user should feel the system working, not read a report about it.
+New line per role per cycle. Do not explain what the panel is doing. The labels are the communication.
 
 ---
 
-## When the Loop Cannot Resolve
+## Escalation to the User
 
-Most panel concerns are execution problems. A word choice created legal exposure. A framing undermined the CEO's credibility. A data point created CFO liability. The writing agent can solve execution problems without the user.
+Most panel concerns are execution problems — a word choice, a framing, a missing disclaimer. The writing agent resolves these without user involvement.
 
-A small number of concerns are intent problems: the panel's concern cannot be addressed without changing what the document is fundamentally trying to say. These are rare. When they occur, surface a flag to the user.
+Escalate to the user only when:
+- A concern cannot be addressed without changing what the document is fundamentally trying to say, AND
+- The writing agent cannot determine the right resolution without knowing the user's actual intent or a fact only the user has
 
-The flag format:
+Do not escalate legal judgment calls. Do not escalate stylistic disagreements between lenses. Do not escalate anything the writing agent can resolve by adding a safe harbor, reframing a sentence, or choosing the more defensible of two equivalent options.
+
+When escalation is genuinely necessary:
+
 ```
 PANEL FLAG — [Role]
-Concern: [What the executive cannot clear, and why]
-Decision required: [What the user needs to decide to resolve it]
+Concern: [What the executive cannot clear and why — specific, not general]
+Decision required: [The one thing the user needs to decide — not a legal opinion request, not a list of options, one decision]
 ```
 
-Example:
-```
-PANEL FLAG — General Counsel
-Concern: The "no further reductions planned" statement cannot be made without creating securities law exposure for a public company. Removing it changes the reassurance the document is trying to deliver to employees.
-Decision required: Either remove the no-further-reductions statement, or confirm that securities counsel has reviewed and approved it as a forward-looking statement with proper hedging.
-```
-
-Do not propose solutions in the flag. Present the tension and the decision. The user resolves it; the loop resumes.
+The user decides. The loop resumes with their answer in context.
 
 ---
 
 ## Loop Boundaries
 
-- Maximum five revision cycles before escalating any unresolved concern to the user as a panel flag. Do not loop indefinitely.
-- Each executive lens clears independently. A cleared lens does not re-review unless the revision substantively changes content in their domain.
-- The Intent Guardian runs only after the panel clears — not during the revision loop.
-- Do not abbreviate the panel. All seven lenses run on every cycle unless a lens has already cleared and the revision does not touch their domain.
+- Maximum five revision cycles. If a concern is unresolved after five cycles, escalate as a panel flag.
+- Each lens agent clears independently. A cleared lens does not re-run unless the revision touches content in their domain.
+- Intent Guardian runs after the panel clears — not during revision cycles.
+- Do not skip lens agents to save time. All seven run every cycle unless already cleared.
 
 ---
 
-## This Is Not a Step in the Workflow
+## Output
 
-The panel cannot be bypassed because it is not a step — it is the process by which the document gets written. When the user asks for a formal, discoverable corporate document, this is how you write it.
+The user receives the document that survived the full loop. Nothing else surfaces to them except the status stream and, in rare cases, a panel flag requiring their decision.
 
-The user receives output that survived. Nothing else surfaces to them.
-
----
-
-## Reference Files
-
-- `references/executive-lenses.md` — Seven executive roles with accountability domains, loss functions, and the specific concerns each lens surfaces. Load at the start of every session.
+The panel cannot be bypassed. It is not a step in the workflow — it is how the document gets written.
